@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Labyrinthe WS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            background: black;
+            height: 100dvh;
+
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            width: 700px;
+            height: 700px;
+            border: 2px solid white;
+            border-radius: 5px;
+
+        }
+
+        .info {
+            color: #aaa;
+
+            position: absolute;
+
+            left: 30px;
+            top: 50%;
+
+            transform: translateY(-50%);
+
+            display: flex;
+            flex-direction: column;
+
+            gap: 20px;
+
+            border: 1px solid #aaa;
+            border-radius: 5px;
+            padding: 35px;
+        }
+
+        input[type="color"] {
+            appearance: none;
+            -webkit-appearance: none;
+
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            margin: 0;
+
+            border-radius: 4px;
+
+            background: grey;
+        }
+
+        .field {
+            display: flex;
+            gap: 5px;
+
+            align-items: center;
+        }
+
+        .winBoard {
+            color: #aaa;
+
+            position: absolute;
+
+            right: 30px;
+            top: 50%;
+
+            transform: translateY(-50%);
+
+
+            display: flex;
+            flex-direction: column;
+
+            gap: 20px;
+
+            border: 1px solid #aaa;
+            border-radius: 5px;
+            padding: 35px;
+        }
+
+        .winBoard ul {
+            list-style-type: none;
+            padding-left: 50px;
+        }
+
+        .winBoard li {
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+        .winBoard li::before {
+            content: "🏆";
+
+            position: absolute;
+            left: -30px;
+            bottom: 0px;
+
+        }
+
+        .form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .form input {
+            padding: 10px;
+            border: none;
+            background: transparent;
+            border-bottom: 1px solid #fff;
+            color: #fff;
+            outline: none;
+        }
+
+        .form button {
+            padding: 10px;
+            border: none;
+            background: transparent;
+            border-radius: 5px;
+            border: 1px solid #fff;
+            color: #fff;
+            cursor: pointer;
+
+            transition: all 0.3s ease-in-out;
+        }
+
+        .form button:hover {
+            background: #fff;
+            color: #000;
+        }
+
+        .flex {
+            display: flex;
+            flex-direction: column;
+            position: absolute;
+
+            left: 30px;
+            top: 30px;
+
+
+            display: flex;
+
+            gap: 20px;
+        }
+
+        .flexRe {
+            display: flex;
+            flex-direction: column;
+
+
+            display: flex;
+
+            gap: 20px;
+        }
+
+        .data {
+            color: #aaa;
+
+            display: flex;
+
+            align-items: center;
+
+            border: 1px solid #aaa;
+            border-radius: 5px;
+            padding: 20px;
+
+            gap: 10px;
+        }
+
+        .verBar {
+            height: 100%;
+            width: 2px;
+            background: #aaa;
+        }
+
+
+
+        .popup {
+            color: #aaa;
+
+
+            display: flex;
+
+            border: 1px solid #aaa;
+            border-radius: 5px;
+            padding: 20px;
+
+            gap: 10px;
+
+            text-align: center;
+            justify-content: center;
+
+            opacity: 0;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .actif {
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="flex">
+        <div class="data">
+            <span id="position"></span>
+            <div class="verBar">
+            </div>
+            <div class="flexRe">
+                <span id="vision"></span>
+                <span id="resteVision">Reste : 3</span>
+            </div>
+        </div>
+
+
+
+        <div class="popup">
+            Vision +2
+        </div>
+
+    </div>
+
+
+    <div class="info">
+
+        <span id="id"></span>
+
+        <div class="field">
+
+            <label for="">Wall Color</label>
+            <input type="color" name="" id="wallColor">
+        </div>
+
+        <div class="field">
+            <label for="">Floor Color</label>
+            <input type="color" name="" id="floorColor">
+        </div>
+
+        <span id="name"></span>
+        <div class="form">
+            <input type="text" id="nameInput" placeholder="Votre Nom">
+            <button onclick="changeName()">Changer de nom</button>
+        </div>
+
+    </div>
+
+    <div class="winBoard">
+        <span id="nb_win"></span>
+        <ul id="nameWiners">
+        </ul>
+    </div>
+
+
+    <canvas></canvas>
+
+
+    <script>
+        const idText = document.querySelector('#id');
+        const nameText = document.querySelector('#name');
+
+        const nbWin = document.querySelector('#nb_win');
+        const nameWiners = document.querySelector('#nameWiners');
+
+        const nameInput = document.getElementById("nameInput")
+
+        const visionText = document.getElementById("vision")
+        const resteVisionText = document.getElementById("resteVision")
+
+        const popUp = document.querySelector('.popup')
+        var popUpAnimate = false
+        var popUpHistory = []
+
+        const ws = new WebSocket('ws://10.242.212.88:55555');
+
+        const canvas = document.querySelector('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const wallColorInput = document.getElementById('wallColor');
+        const floorColorInput = document.getElementById('floorColor');
+
+        const canvasDimention = {
+            width: canvas.width = 500,
+            height: canvas.height = 500
+        }
+
+        const scale = 0.5
+
+        var viewZone = 6
+        if (viewZone % 2 == 0) viewZone++;
+
+        var Me = {}
+
+        var allPlayers = []
+
+        var wallColor = '#000000'
+        var floorColor = '#ffffff'
+        wallColorInput.value = wallColor
+        floorColorInput.value = floorColor
+
+        var maze;
+        var tile = {
+            width: canvasDimention.width / viewZone,
+            height: canvasDimention.height / viewZone
+        }
+
+
+
+
+
+        const visionItemImg = new Image();
+        visionItemImg.src = "./image/visionItem.png"
+        const ziziItemImg = new Image();
+        ziziItemImg.src = "./image/ziziItem.png"
+
+        visionItemImg.onerror = () => {
+            console.error("Erreur de chargement de l'image");
+        };
+
+
+
+
+
+        function changeName() {
+            const name = nameInput.value
+            ws.send(JSON.stringify({ type: 'changeName', name: name }))
+        }
+
+        ws.onopen = (event) => {
+            console.log('Connexion établie !');
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data); //event.data
+            // console.log('Message recu : ', data);
+            // console.log(data.type);
+
+            if (data.type == 'init') {
+
+
+                Me.id = data.id;
+                Me.position = data.position;
+
+                Me.color = data.color;
+                Me.name = data.name;
+
+                viewZone = data.vision
+
+                resteVisionText.textContent = 'Reste : ' + data.maze.visionItemsPosition.length
+                console.log(viewZone)
+
+
+                maze = data.maze;
+                idText.textContent = 'id : ' + data.id;
+                nameText.textContent = 'Nom : ' + data.name;
+                nameInput.value = data.name
+
+                console.log(maze)
+
+                // tile = {
+                //     width: canvasDimention.width / maze.width,
+                //     height: canvasDimention.height / maze.height
+                // }
+
+
+                update();
+
+
+            }
+
+            if (data.type == 'newMaze') {
+                // console.log(data)
+                maze = data.maze;
+
+                Me.position = data.maze.spawnPosition;
+
+                ws.send(JSON.stringify({ type: 'reset', position: Me.position }))
+                update();
+            }
+
+            if (data.type == 'updateMyPosition') {
+                Me.position = data.position;
+                update();
+            }
+
+            if (data.type == 'updateMyVision') {
+                viewZone = data.vision;
+
+                tile = {
+                    width: canvasDimention.width / viewZone,
+                    height: canvasDimention.height / viewZone
+                }
+
+                visionText.textContent = 'Vision : ' + data.vision
+
+                update();
+            }
+
+            if (data.type == 'newName') {
+                nameText.textContent = 'Nom : ' + data.name;
+                nameInput.value = data.name
+                update();
+            }
+
+            if (data.type == 'allPlayers') {
+                allPlayers = data.players;
+
+                // console.log(allPlayers)
+                update();
+            }
+
+            if (data.type == 'updateMaze') {
+                maze = data.maze;
+                resteVisionText.textContent = 'Reste : ' + data.maze.visionItemsPosition.length
+                update();
+            }
+
+            if (data.type == "popUp") {
+                popUpHistory.push(data.message)
+            }
+
+        };
+
+        wallColorInput.addEventListener('input', (e) => {
+            wallColor = e.target.value;
+            drawMaze();
+        })
+
+        floorColorInput.addEventListener('input', (e) => {
+            floorColor = e.target.value;
+            drawMaze();
+        })
+
+
+        window.addEventListener("keydown", (e) => {
+            if (e.key == "z") {
+                ws.send(JSON.stringify({ type: 'move', key: 'z' }))
+            } else if (e.key == "s") {
+                ws.send(JSON.stringify({ type: 'move', key: 's' }))
+            } else if (e.key == "q") {
+                ws.send(JSON.stringify({ type: 'move', key: 'q' }))
+            } else if (e.key == "d") {
+                ws.send(JSON.stringify({ type: 'move', key: 'd' }))
+            }
+        });
+
+
+        function update() {
+            drawMaze()
+            drawAllPlayers()
+            drawPlayer()
+            verifyWiner()
+            document.getElementById("position").textContent = 'Position x: ' + Me.position.x + ' y: ' + Me.position.y;
+
+
+        }
+
+
+
+        function verifyWiner() {
+            let nbWinners = 0
+            let winnerName = []
+            allPlayers.forEach(player => {
+                if (player.win) {
+                    nbWinners++
+                    let speudo = player.type == 'you' ? 'Vous' : player.speudo
+                    winnerName.push(speudo)
+                }
+            })
+
+            nbWin.textContent = nbWinners + '/' + allPlayers.length + ' personnes a gagner'
+            nameWiners.innerHTML = ''
+            winnerName.forEach(name => {
+                nameWiners.innerHTML += '<li>' + name + '</li>'
+            })
+        }
+
+
+        function drawAllPlayers() {
+            drawMaze();
+            allPlayers.forEach(player => {
+
+                if (player.type == "you") return
+
+
+
+                var x1 = Me.position.x - Math.floor(viewZone / 2);
+                var y1 = Me.position.y - Math.floor(viewZone / 2);
+
+                // x1 = Math.max(0, Math.min(x1, maze.width - viewZone));
+                // y1 = Math.max(0, Math.min(y1, maze.height - viewZone));
+
+
+
+                const x2 = x1 + viewZone;
+                const y2 = y1 + viewZone;
+
+                // console.log("__________________")
+                // console.log("__________________")
+                // console.log(x1, y1)
+                // console.log(x2, y2)
+
+                // console.log(maze.height)
+
+                // console.log(maze.height - x2)
+                // console.log(x1 + (maze.height - x2))
+
+                // console.log(player.color)
+                // console.log(player.position.x >= (x1 + (maze.height - x2)) && player.position.x <= x2 &&
+                //     player.position.y >= (y1 + (maze.width - y2)) && player.position.y <= y2 )
+
+                // console.log(player.position.y >= (y1 + (maze.width - y2)) && player.position.y <= y2)
+
+                // console.log(player.position.y >= (y1 + (maze.width - y2)))
+
+
+                dxm = maze.width - x2
+                dym = maze.height - y2
+
+                rdxm = maze.width - x1
+                rdym = maze.height - y1
+
+
+                // console.log(player.color)
+
+                // console.log(player.position.x >= x1 + dym && player.position.x + dym <= x2 &&
+                //     player.position.y - dym >= y1 && player.position.y - dym <= y2)
+
+                // console.log(player.position.x >= x1 && player.position.x <= x2 &&
+                //     player.position.y >= y1 && player.position.y <= y2)
+
+                // console.log(player.position.x >= x1 && player.position.x <= x2 - x1 &&
+                //     player.position.y >= y1 && player.position.y <= y2 - y1)
+
+
+
+                f = (x1 + (maze.height - x2))
+                g = (y2 - y1)
+
+                // console.log(player.position.x >= f && player.position.x <= x2 &&
+                //     player.position.y >= y1 && player.position.y <= g)
+
+
+                // console.log(f, g)
+                // console.log(player.position.x, player.position.y)
+                // console.log(x2, y2)
+
+                // console.log(x1, y1)
+
+
+                if (
+                    player.position.x >= x1 + dym && player.position.x + dym <= x2 &&
+                    player.position.y - dym >= y1 && player.position.y - dym <= y2
+                    ||
+                    player.position.x >= x1 && player.position.x <= x2 &&
+                    player.position.y >= y1 && player.position.y <= y2
+                    ||
+                    player.position.x >= x1 && player.position.x <= x2 - x1 &&
+                    player.position.y >= y1 && player.position.y <= y2 - y1
+                    ||
+                    player.position.x >= (x1 + (maze.height - x2)) && player.position.x <= x2 &&
+                    player.position.y >= y1 && player.position.y <= g
+                ) {
+                    // console.log("draw other player")
+
+                    dx = player.position.x - Me.position.x
+                    dy = player.position.y - Me.position.y
+
+                    // console.log("Me ")
+                    // console.log(Me.position)
+                    // console.log("Player ")
+                    // console.log( player.position)
+                    // console.log("dxy ", dx, dy)
+
+
+
+                    ctx.fillStyle = player.color
+                    const w = tile.width * scale;
+                    const h = tile.height * scale;
+
+                    // console.log("w : h")
+                    // console.log(w, h)
+
+                    var y
+                    var x
+
+                    if (y1 < 0) {
+                        y = ((Math.floor(viewZone / 2) + 1 + y1) + dy) * tile.height - tile.width + h / 2;
+                    } else if (y2 > maze.height) {
+                        // console.log("supp")
+                        y = (viewZone - (maze.height - player.position.y - 1)) * tile.height - tile.width + h / 2;
+                    }
+                    else {
+
+                        y = ((Math.floor(viewZone / 2) + 1) + dy) * tile.height - tile.width + h / 2;
+                    }
+
+                    if (x1 < 0) {
+                        x = ((Math.floor(viewZone / 2) + 1 + x1) + dx) * tile.width - tile.width + w / 2;
+
+                    } else if (x2 > maze.width) {
+                        // console.log("supp")
+
+                        x = (viewZone - (maze.width - player.position.x - 1)) * tile.width - tile.width + w / 2;
+
+                        // x = ((Math.floor(viewZone / 2) + 1) + dx + 1) * tile.width - tile.width + w / 2;
+                    } else {
+                        x = ((Math.floor(viewZone / 2) + 1) + dx) * tile.width - tile.width + w / 2;
+                    }
+
+                    // console.log("__________________")
+                    // console.log(y2)
+                    // console.log(maze.height)
+
+                    // console.log(maze.height - player.position.y - 1)
+                    // console.log(viewZone - (maze.height - player.position.y - 1))
+
+
+                    // console.log("draw : " + x + " " + y)
+
+
+                    ctx.fillRect(x, y, w, h);
+
+
+                }
+
+
+
+
+
+            })
+
+        }
+
+        function drawPlayer() {
+
+            ctx.fillStyle = Me.color;
+
+
+            // Clamp x1 et y1 pour rester dans la map
+            let x1 = Me.position.x - Math.floor(viewZone / 2);
+            let y1 = Me.position.y - Math.floor(viewZone / 2);
+
+            const w = tile.width * scale;
+            const h = tile.height * scale;
+
+            // console.log("__________________")
+            // console.log(x1, y1)
+            // console.log(x1 + viewZone, y1 + viewZone)
+            // console.log(maze.width, maze.height)
+
+            var y
+            var x
+
+            if (y1 < 0) {
+                y = (Math.floor(viewZone / 2) + y1) * tile.height + (tile.height - h) / 2;
+            } else if (y1 + viewZone > maze.height) {
+                y = (Me.position.y - y1 - (maze.height - y1 - viewZone)) * tile.height + (tile.height - h) / 2;
+            }
+            else {
+
+                y = (Me.position.y - y1) * tile.height + (tile.height - h) / 2;
+            }
+
+            if (x1 < 0) {
+                x = (Math.floor(viewZone / 2) + x1) * tile.width + (tile.width - w) / 2;
+            } else if (x1 + viewZone > maze.width) {
+                x = (Me.position.x - x1 - (maze.width - x1 - viewZone)) * tile.width + (tile.width - w) / 2
+                // console.log("supp y")
+
+            } else {
+                x = (Me.position.x - x1) * tile.width + (tile.width - w) / 2;
+            }
+
+            // console.log("__________________")
+
+            // console.log(y1)
+            // console.log(Me.position.y)
+            // console.log(Math.floor(viewZone / 2) + y1)
+
+
+            // console.log(Me.position.y - y1 )
+            // console.log(maze.height - y1 - viewZone)
+            // console.log(Me.position.y - y1 - (maze.height - y1 - viewZone))
+
+
+
+
+            // console.log(x1 - viewZone)
+
+            // console.log("me draw")
+            // console.log(x, y)
+
+            ctx.fillRect(x, y, w, h);
+        }
+
+        function drawMaze() {
+
+
+            // console.log("draw maze")
+
+            walls = maze.walls;
+            winPosition = maze.winPosition;
+            spawnPosition = maze.spawnPosition;
+            visionItemsPosition = maze.visionItemsPosition;
+            ziziItemsPosition = maze.ziziItemsPostion;
+
+            // Calculer x1 et y1 clampés avant la boucle
+            let x1 = Me.position.x - Math.floor(viewZone / 2);
+            let y1 = Me.position.y - Math.floor(viewZone / 2);
+
+            // console.log("________________")
+            // console.log("before")
+            // console.log(x1, y1)
+
+
+            x1 = Math.max(0, Math.min(x1, maze.width - viewZone));
+            y1 = Math.max(0, Math.min(y1, maze.height - viewZone));
+
+            // console.log("after")
+            // console.log(x1, y1)
+
+            // console.log("diff")
+            // console.log(Me.position.x - x1)
+            // console.log(Me.position.y - y1)
+            // console.log("viewZone")
+            // console.log(viewZone)
+
+            // console.log(x1, y1)
+
+            for (let y = y1; y < y1 + viewZone; y++) {
+                for (let x = x1; x < x1 + viewZone; x++) {
+
+
+
+                    const co = { x, y };
+
+                    const isWall = walls.some(w => w.x === x && w.y === y);
+                    const isVisionItem = visionItemsPosition.some(w => w.x === x && w.y === y);
+                    const isZiziItem = ziziItemsPosition.some(w => w.x === x && w.y === y);
+
+
+                    ctx.fillStyle = isWall ? 'black' : 'grey';
+                    ctx.fillRect(
+                        (x - x1) * tile.width,
+                        (y - y1) * tile.height,
+                        tile.width,
+                        tile.height
+                    );
+
+
+                    if (isVisionItem) {
+
+                        // ctx.fillStyle = 'purple';
+                        // ctx.fillRect(
+                        //     (x - x1) * tile.width,
+                        //     (y - y1) * tile.height,
+                        //     tile.width,
+                        //     tile.height
+                        // );
+
+                        ctx.drawImage(visionItemImg, (x - x1) * tile.width, (y - y1) * tile.height, tile.width, tile.height);
+
+                    }
+
+                    if (isZiziItem) {
+
+                        // ctx.fillStyle = 'blue';
+                        // ctx.fillRect(
+                        //     (x - x1) * tile.width,
+                        //     (y - y1) * tile.height,
+                        //     tile.width,
+                        //     tile.height
+                        // );
+
+                        ctx.drawImage(ziziItemImg, (x - x1) * tile.width, (y - y1) * tile.height, tile.width, tile.height);
+
+                    }
+                }
+            }
+
+
+
+            if (x1 <= winPosition.x &&
+                x1 + viewZone > winPosition.x &&
+                y1 <= winPosition.y &&
+                y1 + viewZone > winPosition.y) {
+                ctx.fillStyle = 'green'
+                ctx.fillRect((winPosition.x - x1) * tile.width, (winPosition.y - y1) * tile.height, tile.width, tile.height)
+            }
+
+            if (x1 <= spawnPosition.x &&
+                x1 + viewZone > spawnPosition.x &&
+                y1 <= spawnPosition.y &&
+                y1 + viewZone > spawnPosition.y) {
+                ctx.fillStyle = 'red'
+                ctx.fillRect((spawnPosition.x - x1) * tile.width, (spawnPosition.y - y1) * tile.height, tile.width, tile.height)
+
+            }
+
+            // ctx.fillStyle = '#ff000010'
+            // ctx.fillRect(x1 * tile.width, y1 * tile.height, viewZone * tile.width, viewZone * tile.width)
+
+        }
+
+
+
+        setInterval(() => {
+            // console.log(popUpHistory)
+            if (!popUpAnimate && popUpHistory.length > 0) {
+                let pop = popUpHistory.shift(); // retire et récupère le premier élément
+                popUp.innerHTML = pop;
+                popUp.classList.add('actif');
+                popUpAnimate = true;
+
+                setTimeout(() => {
+                    popUp.classList.remove('actif');
+                    popUpAnimate = false;
+                }, 3000);
+            }
+        }, 500);
+
+
+
+
+    </script>
+
+</body>
+
+</html>

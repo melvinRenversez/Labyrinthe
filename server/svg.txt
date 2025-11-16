@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Labyrinthe WS</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            background: grey;
+        }
+
+        canvas {
+            width: 500px;
+            height: 500px;
+            border: 1px solid red;
+
+        }
+    </style>
+</head>
+
+<body>
+
+    <span id="id"></span>
+    <span id="position"></span>
+
+    <canvas></canvas>
+
+
+    <script>
+        const idText = document.querySelector('#id');
+        const ws = new WebSocket('ws://10.242.212.88:3000');
+
+        const canvas = document.querySelector('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const canvasDimention = {
+            width: canvas.width = 300,
+            height: canvas.height = 300
+        }
+
+        const scale = 0.5
+
+        var Me = {}
+
+        var allPlayers = {}
+
+        var maze;
+        var tile = {}
+
+        ws.onopen = (event) => {
+            console.log('Connexion établie !');
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data); //event.data
+            console.log('Message recu : ', data);
+            console.log(data.type);
+
+            if (data.type == 'init') {
+
+                Me.id = data.id;
+                Me.position = data.position;
+                Me.color = data.color;
+
+
+                maze = data.maze;
+                idText.textContent = 'Votre id est : ' + data.id;
+
+                tile = {
+                    width: canvasDimention.width / maze.width,
+                    height: canvasDimention.height / maze.height
+                }
+
+
+                update();
+
+
+            }
+
+            if (data.type == 'updateMyPosition') {
+                Me.position = data.position;
+                update();
+            }
+
+            if (data.type == 'allPlayers') {
+                allPlayers = data.players;
+                console.log("allPlayers : ", allPlayers)
+                update();
+            }
+        };
+
+
+        window.addEventListener("keydown", (e) => {
+            if (e.key == "z") {
+                ws.send(JSON.stringify({ type: 'move', key: 'z' }))
+            } else if (e.key == "s") {
+                ws.send(JSON.stringify({ type: 'move', key: 's' }))
+            } else if (e.key == "q") {
+                ws.send(JSON.stringify({ type: 'move', key: 'q' }))
+            } else if (e.key == "d") {
+                ws.send(JSON.stringify({ type: 'move', key: 'd' }))
+            }
+        });
+
+
+        function update() {
+            drawMaze()
+            drawAllPlayers()
+            drawPlayer()
+
+            document.getElementById("position").textContent = 'x: ' + Me.position.x + ' y: ' + Me.position.y;
+        }
+
+
+        function drawAllPlayers() {
+            drawMaze();
+            allPlayers.forEach(player => {
+
+                ctx.fillStyle = player.color
+
+                const w = tile.width * scale;
+                const h = tile.height * scale;
+
+
+                const x = player.position.x * tile.width + (tile.width - w) / 2;
+                const y = player.position.y * tile.height + (tile.height - h) / 2;
+
+                ctx.fillRect(x, y, w, h);
+            })
+
+        }
+
+
+        function drawPlayer() {
+            ctx.fillStyle = Me.color
+
+            const w = tile.width * scale;
+            const h = tile.height * scale;
+
+
+            const x = Me.position.x * tile.width + (tile.width - w) / 2;
+            const y = Me.position.y * tile.height + (tile.height - h) / 2;
+
+            ctx.fillRect(x, y, w, h);
+
+        }
+
+        function drawMaze() {
+
+            walls = maze.walls;
+            winPosition = maze.winPosition;
+            spawnPosition = maze.spawnPosition;
+
+            for (let row = 0; row < maze.width; row++) {
+                for (let col = 0; col < maze.height; col++) {
+                    const co = { x: col, y: row }
+
+                    const isWall = walls.some(w => w.x === co.x && w.y === co.y);
+
+                    ctx.fillStyle = isWall ? 'black' : 'grey';
+
+                    ctx.fillRect(col * tile.width, row * tile.height, tile.width, tile.height)
+                }
+            }
+
+            ctx.fillStyle = 'green'
+            ctx.fillRect(winPosition.x * tile.width, winPosition.y * tile.height, tile.width, tile.height)
+
+            ctx.fillStyle = 'red'
+            ctx.fillRect(spawnPosition.x * tile.width, spawnPosition.y * tile.height, tile.width, tile.height)
+        }
+
+
+
+
+    </script>
+
+</body>
+
+</html>
